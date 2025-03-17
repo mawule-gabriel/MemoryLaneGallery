@@ -1,4 +1,4 @@
-name: Build and Deploy MemoryLane
+name: Build, Push to ECR, and Deploy to ECS
 
 on:
   push:
@@ -10,162 +10,122 @@ env:
   ECR_REPOSITORY: memory-lane
   ECS_CLUSTER: MemoryLane-Cluster
   ECS_SERVICE: MemoryLane-Service
-  TASK_DEFINITION: MemoryLane-Task
+  ECS_TASK_DEFINITION: .aws/task-definition.json
   CONTAINER_NAME: memory-lane
   CONTAINER_PORT: 5000
 
 jobs:
-  build-and-deploy:
-    name: Build and Deploy
+  build-push-deploy:
+    name: Build and Push to ECR and then Deploy to ECS
     runs-on: ubuntu-latest
-    
-    steps:
-    - name: Checkout code
-      uses: actions/checkout@v3
-      
-    - name: Set up JDK 21
-      uses: actions/setup-java@v3
-      with:
-        java-version: '21'
-        distribution: 'temurin'
-        cache: maven
-        
-    - name: Build with Maven
-      run: mvn clean package -DskipTests
-      
-    - name: Configure AWS credentials
-      uses: aws-actions/configure-aws-credentials@v2
-      with:
-        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-        aws-region: ${{ env.AWS_REGION }}
-        
-    - name: Login to Amazon ECR
-      id: login-ecr
-      uses: aws-actions/amazon-ecr-login@v1
 
-    - name: Mask Docker password
-      run: |
-        echo "::add-mask::${{ steps.login-ecr.outputs.password }}"
-        
-    - name: Build, tag, and push image to Amazon ECR
-      id: build-image
-      env:
-        ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
-        IMAGE_TAG: ${{ github.sha }}
-      run: |
-        # Build Docker image
-        docker build -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG .
-        # Tag with latest for convenience
-        docker tag $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG $ECR_REGISTRY/$ECR_REPOSITORY:latest
-        # Push both tags to ECR
-        docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
-        docker push $ECR_REGISTRY/$ECR_REPOSITORY:latest
-        # Save the image URI for later use
-        echo "image=$ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG" >> $GITHUB_OUTPUT
-        
-    - name: Download current task definition
-      run: |
-        aws ecs describe-task-definition \
-          --task-definition ${{ env.TASK_DEFINITION }} \
-          --query taskDefinition > task-definition.json
-        
-    - name: Fill in the new image ID in the Amazon ECS task definition
-      id: task-def
-      uses: aws-actions/amazon-ecs-render-task-definition@v1
-      with:
-        task-definition: task-definition.json
-        container-name: ${{ env.CONTAINER_NAME }}
-        image: ${{ steps.build-image.outputs.image }}
-        
-    - name: Register new task definition revision
-      id: register-task-def
-      run: |
-        NEW_TASK_DEF_ARN=$(aws ecs register-task-definition \
-          --cli-input-json file://${{ steps.task-def.outputs.task-definition }} \
-          --query 'taskDefinition.taskDefinitionArn' \
-          --output text)
-        echo "task_definition_arn=$NEW_TASK_DEF_ARN" >> $GITHUB_OUTPUT
-        
-    - name: Generate AppSpec content
-      id: appspec
-      run: |
-        APPSPEC_CONTENT='{
-          "version": 1,
-          "Resources": [
-            {
-              "TargetService": {
-                "Type": "AWS::ECS::Service",
-                "Properties": {
-                  "TaskDefinition": "${{ steps.register-task-def.outputs.task_definition_arn }}",
-                  "LoadBalancerInfo": {
-                    "ContainerName": "${{ env.CONTAINER_NAME }}",
-                    "ContainerPort": ${{ env.CONTAINER_PORT }}
-                  }
-                }
+    steps:
+      # Checkout the repository
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      # Configure AWS Credentials for ECR
+      - name: Configure AWS Credentials for ECR
+        uses: aws-actions/configure-aws-credentials@v2
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: us-east-1
+
+      # Login to Amazon ECR
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v1
+
+      # Build the Docker image
+      - name: Build Docker Image
+        run: |
+          docker build -t ${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPOSITORY }}:latest .
+
+      # Tag and push the image to Amazon ECR
+      - name: Tag and Push Image to ECR
+        env:
+          IMAGE_TAG: ${{ github.sha }}
+        run: |
+          docker tag ${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPOSITORY }}:latest ${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPOSITORY }}:$IMAGE_TAG
+          docker push ${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPOSITORY }}:latest
+          docker push ${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPOSITORY }}:$IMAGE_TAG
+          echo "::set-output name=image::${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPOSITORY }}:$IMAGE_TAG"
+
+      # Reconfigure AWS credentials for ECS deployment (same region as before)
+      - name: Configure AWS Credentials for ECS
+        uses: aws-actions/configure-aws-credentials@v2
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: us-east-1
+
+      # Fill in the new image ID in the Amazon ECS task definition
+      - name: Fill in the new image ID in the Amazon ECS task definition
+        id: task-def
+        uses: aws-actions/amazon-ecs-render-task-definition@v1
+        with:
+          task-definition: ${{ env.ECS_TASK_DEFINITION }}
+          container-name: ${{ env.CONTAINER_NAME }}
+          image: ${{ steps.build-image.outputs.image }}
+
+      # Register the new task definition
+      - name: Register the new task definition
+        run: |
+          aws ecs register-task-definition --cli-input-json file://${{ steps.task-def.outputs.task-definition }}
+
+      # Start CodeDeploy deployment
+      - name: Start CodeDeploy deployment
+        run: |
+          sha256=$(openssl dgst -sha256 -binary .aws/appspec.yaml | openssl enc -base64 -A)
+          aws deploy create-deployment \
+            --application-name MemoryLane-Application \
+            --deployment-group-name MemoryLane-DeploymentGroup \
+            --revision '{
+              "revisionType": "AppSpecContent",
+              "appSpecContent": {
+                "content": "'$(cat appspec.yaml | base64 -w 0)'",
+                "sha256": "'$sha256'"
               }
-            }
-          ]
-        }'
-        # Store AppSpec content in a file
-        echo "$APPSPEC_CONTENT" > appspec.json
-        # Calculate SHA256 of the content
-        APPSPEC_SHA256=$(sha256sum appspec.json | cut -d' ' -f1)
-        echo "appspec_content=$APPSPEC_CONTENT" >> $GITHUB_OUTPUT
-        echo "appspec_sha256=$APPSPEC_SHA256" >> $GITHUB_OUTPUT
-        
-    - name: Create CodeDeploy deployment
-      id: deploy
-      run: |
-        DEPLOYMENT_ID=$(aws deploy create-deployment \
-          --application-name MemoryLane-Application \
-          --deployment-group-name MemoryLane-DeploymentGroup \
-          --revision '{
-            "revisionType": "AppSpecContent",
-            "appSpecContent": {
-              "content": ${{ toJSON(steps.appspec.outputs.appspec_content) }},
-              "sha256": "${{ steps.appspec.outputs.appspec_sha256 }}"
-            }
-          }' \
-          --query 'deploymentId' \
-          --output text)
-          
-        echo "deployment_id=$DEPLOYMENT_ID" >> $GITHUB_OUTPUT
-        echo "Started deployment $DEPLOYMENT_ID"
-        
-    - name: Wait for deployment to complete
-      run: |
-        echo "Waiting for deployment ${{ steps.deploy.outputs.deployment_id }} to complete..."
-        
-        while true; do
-          STATUS=$(aws deploy get-deployment \
-            --deployment-id ${{ steps.deploy.outputs.deployment_id }} \
-            --query 'deploymentInfo.status' \
-            --output text)
-            
-          echo "Deployment status: $STATUS"
-          
-          if [ "$STATUS" == "Succeeded" ]; then
-            echo "Deployment succeeded!"
-            break
-          elif [ "$STATUS" == "Failed" ] || [ "$STATUS" == "Stopped" ]; then
-            echo "Deployment $STATUS!"
-            exit 1
-          fi
-          
+            }' \
+            --deployment-config-name CodeDeployDefault.ECSAllAtOnce \
+            --description "Deployment triggered by GitHub Actions"
+
+      # Wait for deployment to complete
+      - name: Wait for deployment to complete
+        run: |
           echo "Waiting for deployment to complete..."
-          sleep 30
-        done
-        
-    - name: Get Application URL
-      if: success()
-      run: |
-        ALB_DNS=$(aws cloudformation describe-stacks \
-          --stack-name ECScluster1 \
-          --query "Stacks[0].Outputs[?OutputKey=='LoadBalancerDNS'].OutputValue" \
-          --output text)
           
-        echo "=================================================================="
-        echo "✅ Deployment completed successfully!"
-        echo "🌐 Application is available at: http://$ALB_DNS"
-        echo "=================================================================="
+          while true; do
+            STATUS=$(aws deploy get-deployment \
+              --deployment-id ${{ steps.deploy.outputs.deployment_id }} \
+              --query 'deploymentInfo.status' \
+              --output text)
+              
+            echo "Deployment status: $STATUS"
+            
+            if [ "$STATUS" == "Succeeded" ]; then
+              echo "Deployment succeeded!"
+              break
+            elif [ "$STATUS" == "Failed" ] || [ "$STATUS" == "Stopped" ]; then
+              echo "Deployment $STATUS!"
+              exit 1
+            fi
+            
+            echo "Waiting for deployment to complete..."
+            sleep 30
+          done
+
+      # Get Application URL after deployment
+      - name: Get Application URL
+        if: success()
+        run: |
+          ALB_DNS=$(aws cloudformation describe-stacks \
+            --stack-name ECScluster1 \
+            --query "Stacks[0].Outputs[?OutputKey=='LoadBalancerDNS'].OutputValue" \
+            --output text)
+          
+          echo "=================================================================="
+          echo "✅ Deployment completed successfully!"
+          echo "🌐 Application is available at: http://$ALB_DNS"
+          echo "=================================================================="
