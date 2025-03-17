@@ -1,0 +1,27 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'S3 bucket policy for MemoryLane application'
+
+Parameters:
+  BucketName:
+    Type: String
+    Default: memorybucket10
+    Description: Name of the S3 bucket for images
+
+Resources:
+  S3BucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !Ref BucketName
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: ecs-tasks.amazonaws.com
+            Action:
+              - s3:GetObject
+              - s3:PutObject
+              - s3:ListBucket
+            Resource:
+              - !Sub arn:aws:s3:::${BucketName}
+              - !Sub arn:aws:s3:::${BucketName}/*
