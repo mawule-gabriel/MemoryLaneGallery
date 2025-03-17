@@ -1,9 +1,27 @@
-version: 0.0
-Resources:
-  - TargetService:
-      Type: AWS::ECS::Service
-      Properties:
-        TaskDefinition: "${{ steps.register-task-def.outputs.task_definition_arn }}"  
-        LoadBalancerInfo:
-          ContainerName: "memory-lane"  
-          ContainerPort: 5000           
+- name: Generate AppSpec content
+  id: appspec
+  run: |
+    APPSPEC_CONTENT=$(cat <<EOF
+    {
+      "version": 0.0,
+      "Resources": [
+        {
+          "TargetService": {
+            "Type": "AWS::ECS::Service",
+            "Properties": {
+              "TaskDefinition": "${{ steps.register-task-def.outputs.task_definition_arn }}",  # Dynamically updated Task Definition ARN
+              "LoadBalancerInfo": {
+                "ContainerName": "memory-lane",  # Container name from ECS Task Definition
+                "ContainerPort": 5000           # Container port
+              }
+            }
+          }
+        }
+      ]
+    }
+    EOF
+    )
+    echo "$APPSPEC_CONTENT" > appspec.json
+    APPSPEC_SHA256=$(sha256sum appspec.json | cut -d' ' -f1)
+    echo "appspec_content=$APPSPEC_CONTENT" >> $GITHUB_OUTPUT
+    echo "appspec_sha256=$APPSPEC_SHA256" >> $GITHUB_OUTPUT
