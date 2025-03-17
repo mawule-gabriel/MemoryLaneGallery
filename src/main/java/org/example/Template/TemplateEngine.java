@@ -13,7 +13,7 @@ import java.util.regex.Pattern;
 public class TemplateEngine {
     // Simple context class to hold template variables
     public static class Context {
-        private Map<String, Object> variables;
+        private final Map<String, Object> variables;
 
         public Context() {
             this.variables = new HashMap<>();
