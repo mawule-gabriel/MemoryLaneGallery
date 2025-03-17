@@ -67,7 +67,7 @@ jobs:
         with:
           task-definition: ${{ env.ECS_TASK_DEFINITION }}
           container-name: ${{ env.CONTAINER_NAME }}
-          image: ${{ steps.build-image.outputs.image }}
+          image: ${{ steps.tag-and-push-image.outputs.image }}  # Use the output image URI
 
       # Register the new task definition
       - name: Register the new task definition
