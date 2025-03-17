@@ -1,0 +1,9 @@
+version: 0.0
+Resources:
+  - TargetService:
+      Type: AWS::ECS::Service
+      Properties:
+        TaskDefinition: "${{ steps.register-task-def.outputs.task_definition_arn }}"  
+        LoadBalancerInfo:
+          ContainerName: "memory-lane"  
+          ContainerPort: 5000           
