@@ -25,3 +25,5 @@ EXPOSE 5000
 
 # Run the application
 CMD ["java", "-jar", "memory-lane.jar"]
+
+

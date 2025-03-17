@@ -1,8 +1,6 @@
 package org.example.S3Integration;
 
-import com.amazonaws.auth.AWSCredentials;
-import com.amazonaws.auth.AWSStaticCredentialsProvider;
-import com.amazonaws.auth.BasicAWSCredentials;
+import com.amazonaws.auth.DefaultAWSCredentialsProviderChain;
 import com.amazonaws.regions.Regions;
 import com.amazonaws.services.s3.AmazonS3;
 import com.amazonaws.services.s3.AmazonS3ClientBuilder;
@@ -21,18 +19,14 @@ public class S3Client {
     private static final int DEFAULT_IMAGES_PER_PAGE = 12;
 
     public static void initialize() {
-        // Get AWS credentials from environment variables
-        String accessKey = System.getenv("AWS_ACCESS_KEY");
-        String secretKey = System.getenv("AWS_SECRET_KEY");
         bucketName = "memorybucket10";
 
         // Default region - should be configurable in production
         Regions region = Regions.US_EAST_1;
 
-        // Create S3 client
-        AWSCredentials credentials = new BasicAWSCredentials(accessKey, secretKey);
+        // Create S3 client using default credentials provider chain
         s3Client = AmazonS3ClientBuilder.standard()
-                .withCredentials(new AWSStaticCredentialsProvider(credentials))
+                .withCredentials(new DefaultAWSCredentialsProviderChain())
                 .withRegion(region)
                 .build();
 

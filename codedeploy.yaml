@@ -1,0 +1,64 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'CodeDeploy resources for MemoryLane application'
+
+Parameters:
+  EcsStackName:
+    Type: String
+    Default: ECScluster1
+    Description: Name of the ECS CloudFormation stack
+
+Resources:
+  CodeDeployServiceRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: codedeploy.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/AWSCodeDeployRoleForECS
+
+  DeploymentGroup:
+    Type: AWS::CodeDeploy::DeploymentGroup
+    Properties:
+      ApplicationName: !Ref DeploymentApplication
+      ServiceRoleArn: !GetAtt CodeDeployServiceRole.Arn
+      DeploymentConfigName: CodeDeployDefault.ECSAllAtOnce
+      DeploymentGroupName: MemoryLane-DeploymentGroup
+      DeploymentStyle:
+        DeploymentType: BLUE_GREEN
+        DeploymentOption: WITH_TRAFFIC_CONTROL
+      BlueGreenDeploymentConfiguration:
+        DeploymentReadyOption:
+          ActionOnTimeout: CONTINUE_DEPLOYMENT
+          WaitTimeInMinutes: 3
+        TerminateBlueInstancesOnDeploymentSuccess:
+          Action: TERMINATE
+          TerminationWaitTimeInMinutes: 3
+      ECSServices:
+        - ClusterName:
+            Fn::ImportValue: !Sub "${EcsStackName}-ClusterName"
+          ServiceName:
+            Fn::ImportValue: !Sub "${EcsStackName}-ServiceName"
+
+  DeploymentApplication:
+    Type: AWS::CodeDeploy::Application
+    Properties:
+      ApplicationName: MemoryLane-Application
+      ComputePlatform: ECS
+
+Outputs:
+  ApplicationName:
+    Description: CodeDeploy Application Name
+    Value: !Ref DeploymentApplication
+    Export:
+      Name: !Sub "${AWS::StackName}-ApplicationName"
+
+  DeploymentGroupName:
+    Description: CodeDeploy Deployment Group Name
+    Value: !Ref DeploymentGroup
+    Export:
+      Name: !Sub "${AWS::StackName}-DeploymentGroupName"
