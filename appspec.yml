@@ -1,13 +1,15 @@
-version: "0.0"
+version: 0.0
+
 Resources:
   - TargetService:
-      Type: "AWS::ECS::Service"
+      Type: AWS::ECS::Service
       Properties:
-        TaskDefinition: "${{ steps.register-task-def.outputs.task_definition_arn }}"
+        TaskDefinition: "REPLACED_AT_DEPLOYMENT"
         LoadBalancerInfo:
           ContainerName: "memory-lane"
           ContainerPort: 5000
         PlatformVersion: "LATEST"
+
 Hooks:
   BeforeInstall:
     - Location: "arn:aws:lambda:us-east-1:650251709711:function:LLambdaFunctionToValidateBeforeInstall"
