@@ -1,16 +1,13 @@
 name: CI/CD Pipeline
-
 on:
   push:
     branches: [ main ]
-
 env:
   AWS_REGION: us-east-1
   ECR_REPOSITORY: memorylane-repo
   ECS_CLUSTER: memorylane-cluster
   ECS_SERVICE: memorylane-service
   CONTAINER_NAME: memorylane-container
-
 jobs:
   build-and-deploy:
     runs-on: ubuntu-latest
@@ -30,6 +27,11 @@ jobs:
       id: login-ecr
       uses: aws-actions/amazon-ecr-login@v1
       
+    - name: Replace account ID in task definition
+      run: |
+        export AWS_ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
+        sed -i "s/\${AWS_ACCOUNT_ID}/$AWS_ACCOUNT_ID/g" task-definition.json
+      
     - name: Build, tag, and push image to Amazon ECR
       id: build-image
       env:
@@ -39,7 +41,7 @@ jobs:
         # Build a docker container and push it to ECR
         docker build -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG .
         docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
-        echo "::set-output name=image::$ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG"
+        echo "image=$ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG" >> $GITHUB_OUTPUT
         
     - name: Update ECS task definition with new image
       id: task-def
