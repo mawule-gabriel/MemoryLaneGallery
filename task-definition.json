@@ -1,7 +1,7 @@
 {
   "family": "memorylane-task",
-  "executionRoleArn": "arn:aws:iam::ACCOUNT_ID:role/memorylane-ecs-execution-role",
-  "taskRoleArn": "arn:aws:iam::ACCOUNT_ID:role/memorylane-ecs-task-role",
+  "executionRoleArn": "arn:aws:iam::${AWS_ACCOUNT_ID}:role/memorylane-ecs-execution-role",
+  "taskRoleArn": "arn:aws:iam::${AWS_ACCOUNT_ID}:role/memorylane-ecs-task-role",
   "networkMode": "awsvpc",
   "requiresCompatibilities": ["FARGATE"],
   "cpu": "512",
@@ -9,7 +9,7 @@
   "containerDefinitions": [
     {
       "name": "memorylane-container",
-      "image": "ACCOUNT_ID.dkr.ecr.us-east-1.amazonaws.com/memorylane-repo:latest",
+      "image": "${AWS_ACCOUNT_ID}.dkr.ecr.us-east-1.amazonaws.com/memorylane-repo:latest",
       "essential": true,
       "portMappings": [
         {
