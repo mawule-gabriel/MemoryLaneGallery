@@ -52,7 +52,7 @@
                 <configuration>
                     <archive>
                         <manifestEntries>
-                            <Main-Class>org.example.MainClass</Main-Class> <!-- Replace this with your actual main class -->
+                            <Main-Class>org.example.ImageGalleryApp</Main-Class>
                         </manifestEntries>
                     </archive>
                 </configuration>
