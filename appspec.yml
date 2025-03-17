@@ -3,14 +3,8 @@ Resources:
   - TargetService:
       Type: AWS::ECS::Service
       Properties:
-        TaskDefinition: <TASK_DEFINITION>
+        TaskDefinition: ${{ steps.task-def.outputs.task-definition }}  # Dynamically set task definition ARN
         LoadBalancerInfo:
           ContainerName: "memorylane-container"
           ContainerPort: 5000
         PlatformVersion: "LATEST"
-Hooks:
-  - BeforeInstall: "LambdaFunctionToValidateBeforeInstall"
-  - AfterInstall: "LambdaFunctionToValidateAfterInstall"
-  - AfterAllowTestTraffic: "LambdaFunctionToValidateAfterTestTrafficStarts"
-  - BeforeAllowTraffic: "LambdaFunctionToValidateBeforeTrafficStarts"
-  - AfterAllowTraffic: "LambdaFunctionToValidateAfterTrafficStarts"
