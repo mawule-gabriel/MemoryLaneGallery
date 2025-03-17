@@ -1,23 +1,16 @@
 version: 0.0
-
 Resources:
   - TargetService:
       Type: AWS::ECS::Service
       Properties:
-        TaskDefinition: "REPLACED_AT_DEPLOYMENT"
+        TaskDefinition: <TASK_DEFINITION>
         LoadBalancerInfo:
-          ContainerName: "memory-lane"
+          ContainerName: "memorylane-container"
           ContainerPort: 5000
         PlatformVersion: "LATEST"
-
 Hooks:
-  BeforeInstall:
-    - Location: "arn:aws:lambda:us-east-1:650251709711:function:LLambdaFunctionToValidateBeforeInstall"
-  AfterInstall:
-    - Location: "arn:aws:lambda:us-east-1:650251709711:function:LambdaFunctionToValidateAfterInstall"
-  AfterAllowTestTraffic:
-    - Location: "arn:aws:lambda:us-east-1:650251709711:function:LambdaFunctionToValidateAfterTestTrafficStarts"
-  BeforeAllowTraffic:
-    - Location: "arn:aws:lambda:us-east-1:650251709711:function:LambdaFunctionToValidateBeforeAllowingProductionTraffic"
-  AfterAllowTraffic:
-    - Location: "arn:aws:lambda:us-east-1:650251709711:function:LambdaFunctionToValidateAfterAllowingProductionTraffic"
+  - BeforeInstall: "LambdaFunctionToValidateBeforeInstall"
+  - AfterInstall: "LambdaFunctionToValidateAfterInstall"
+  - AfterAllowTestTraffic: "LambdaFunctionToValidateAfterTestTrafficStarts"
+  - BeforeAllowTraffic: "LambdaFunctionToValidateBeforeTrafficStarts"
+  - AfterAllowTraffic: "LambdaFunctionToValidateAfterTrafficStarts"
