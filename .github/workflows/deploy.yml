@@ -70,7 +70,7 @@ jobs:
           aws ecs describe-task-definition --task-definition memory3-task --query taskDefinition > task-definition.json
           
           # Update container image in task definition to use latest tag
-          jq '.containerDefinitions[0].image = "626635425934.dkr.ecr.us-west-2.amazonaws.com/memory3:latest"' task-definition.json > new-task-definition.json
+          jq '.containerDefinitions[0].image = "677276083056.dkr.ecr.us-east-1.amazonaws.com/memory3:latest"' task-definition.json > new-task-definition.json
           
           # Register new task definition version
           NEW_TASK_DEF_ARN=$(aws ecs register-task-definition \
