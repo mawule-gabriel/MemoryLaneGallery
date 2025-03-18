@@ -9,7 +9,7 @@ import java.net.InetSocketAddress;
 public class ImageGalleryApp {
 
     // Configuration properties with default values
-    private static final int DEFAULT_PORT = 5000;
+    private static final int DEFAULT_PORT = 8080;
 
     public static void main(String[] args) throws Exception {
         // Use port 5000 as default
